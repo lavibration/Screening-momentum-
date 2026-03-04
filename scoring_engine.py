@@ -11,6 +11,14 @@ def calculate_scores(df: pd.DataFrame) -> pd.DataFrame:
     # Copy to avoid side effects
     df = df.copy()
     
+    # Fill NaN values for essential columns
+    df['BookValue'] = df['BookValue'].fillna(0)
+    df['MarketCap'] = df['MarketCap'].fillna(1e6) # Small cap if unknown
+    df['AssetGrowth'] = df['AssetGrowth'].fillna(0)
+    df['GrossProfit'] = df['GrossProfit'].fillna(0)
+    df['TotalAssets'] = df['TotalAssets'].fillna(1)
+    df['Momentum'] = df['Momentum'].fillna(0)
+
     # 1. Value: Book-to-Market (BookValue / MarketCap)
     # MarketCap from info, BookValue from BS
     df['Value'] = df['BookValue'] / df['MarketCap']
@@ -26,31 +34,27 @@ def calculate_scores(df: pd.DataFrame) -> pd.DataFrame:
     df['Value_Rank'] = df['Value'].rank(pct=True) * 100
     df['Prof_Rank'] = df['Profitability'].rank(pct=True) * 100
     
-    # Inverted rank for Investment: lower growth is better
+    # Inverted rank for Investment: lower growth is better (rigorous balance sheet)
     df['Inv_Rank'] = df['AssetGrowth'].rank(pct=True, ascending=False) * 100
     
     # Momentum Rank (Condition Filter)
     df['Momentum_Rank'] = df['Momentum'].rank(pct=True) * 100
     
-    # Combined Score (VIP): Mean of Value, Investment, Profitability ranks
-    df['VIP_Score'] = df[['Value_Rank', 'Inv_Rank', 'Prof_Rank']].mean(axis=1)
+    # Dynamic weighting based on Market Cap
+    # Seuil: 6 Mds €
+    threshold = 6e9
+
+    def compute_vip(row):
+        if row['MarketCap'] > threshold:
+            # For large caps, overweight Investment and Profitability
+            return 0.2 * row['Value_Rank'] + 0.5 * row['Inv_Rank'] + 0.3 * row['Prof_Rank']
+        else:
+            # 1/N for smaller caps
+            return (row['Value_Rank'] + row['Inv_Rank'] + row['Prof_Rank']) / 3.0
+
+    df['VIP_Score'] = df.apply(compute_vip, axis=1)
     
     # Final Rank of VIP Score
     df['VIP_Rank'] = df['VIP_Score'].rank(pct=True) * 100
     
     return df
-
-if __name__ == "__main__":
-    # Test data
-    data = {
-        'Ticker': ['A', 'B', 'C', 'D'],
-        'MarketCap': [1000, 2000, 1500, 3000],
-        'BookValue': [500, 400, 900, 600],
-        'AssetGrowth': [0.1, 0.05, 0.2, 0.01],
-        'GrossProfit': [200, 300, 150, 400],
-        'TotalAssets': [1000, 1500, 1200, 2000],
-        'Momentum': [0.2, -0.1, 0.05, 0.15]
-    }
-    df = pd.DataFrame(data)
-    scored_df = calculate_scores(df)
-    print(scored_df[['Ticker', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'VIP_Score', 'VIP_Rank', 'Momentum_Rank']])

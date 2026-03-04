@@ -13,6 +13,20 @@ def get_cac40_tickers() -> List[str]:
         "STMPA.PA", "TTE.PA", "HO.PA", "VIE.PA", "DG.PA", "WLN.PA"
     ]
 
+def get_cac_mid_tickers() -> List[str]:
+    """Returns representative tickers for the CAC Mid 60 components."""
+    return [
+        "ADP.PA", "AF.PA", "ALTE.PA", "APAM.PA", "ATO.PA", "ELIS.PA", "IPN.PA", "NK.PA",
+        "DEC.PA", "NEOEN.PA", "RUI.PA", "SEB.PA", "SK.PA", "SPIE.PA", "VRLA.PA", "VK.PA"
+    ]
+
+def get_cac_small_tickers() -> List[str]:
+    """Returns representative tickers for the CAC Small components."""
+    return [
+        "ABCA.PA", "AKW.PA", "BENE.PA", "BIG.PA", "BON.PA", "CRI.PA", "LISI.PA", "MMT.PA",
+        "VALN.PA", "GFC.PA", "DBV.PA", "ARG.PA"
+    ]
+
 def fetch_data(tickers: List[str]):
     """
     Fetches historical prices and fundamental data for a list of tickers.

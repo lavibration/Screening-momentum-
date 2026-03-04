@@ -2,9 +2,9 @@ from dash import Dash, html, dcc, dash_table, Input, Output, State, callback_con
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
-from src.data_provider import get_cac40_tickers, fetch_data, get_financial_metrics
-from src.scoring_engine import calculate_scores
-from src.strategy import generate_signals
+from data_provider import get_cac40_tickers, get_cac_mid_tickers, get_cac_small_tickers, fetch_data, get_financial_metrics
+from scoring_engine import calculate_scores
+from strategy import generate_signals
 
 def create_layout():
     return dbc.Container([
@@ -15,6 +15,18 @@ def create_layout():
         dbc.Row([
             dbc.Col([
                 html.H4("Configurations"),
+                html.Label("Sélection de l'indice"),
+                dbc.RadioItems(
+                    id="index-selector",
+                    options=[
+                        {"label": "CAC 40", "value": "cac40"},
+                        {"label": "CAC Mid 60", "value": "cacmid"},
+                        {"label": "CAC Small", "value": "cacsmall"},
+                    ],
+                    value="cac40",
+                    className="mb-3"
+                ),
+
                 html.Label("Seuil d'achat VIP (Top X%)"),
                 dcc.Slider(id='buy-threshold', min=50, max=100, step=5, value=80, marks={i: str(i) for i in range(50, 101, 10)}),
                 
@@ -73,14 +85,21 @@ app.layout = create_layout()
 @app.callback(
     Output('full-data-store', 'data'),
     Output('loading-output', 'children'),
-    Input('refresh-btn', 'n_clicks')
+    Input('refresh-btn', 'n_clicks'),
+    State('index-selector', 'value')
 )
-def update_data(n_clicks):
+def update_data(n_clicks, selected_index):
     if n_clicks is None:
         return None, ""
     
-    tickers = get_cac40_tickers()
-    # Limit to 10 for faster loading during demo/testing if needed
+    if selected_index == "cacmid":
+        tickers = get_cac_mid_tickers()
+    elif selected_index == "cacsmall":
+        tickers = get_cac_small_tickers()
+    else:
+        tickers = get_cac40_tickers()
+
+    # Limit for faster loading during demo/testing
     # tickers = tickers[:15]
     raw_data = fetch_data(tickers)
     df = get_financial_metrics(raw_data)
@@ -106,7 +125,8 @@ def update_ui(data, buy_th, exit_th, mom_th):
     df_signals = generate_signals(df, buy_vip_threshold=buy_th, exit_vip_threshold=exit_th, exit_momentum_threshold=mom_th)
     
     # Table columns
-    cols = [{"name": i, "id": i} for i in ['Ticker', 'Name', 'Signal', 'VIP_Rank', 'Momentum_Rank', 'Sector', 'Price']]
+    display_cols = ['Ticker', 'Name', 'Signal', 'VIP_Rank', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'Sector', 'Price']
+    cols = [{"name": i, "id": i} for i in display_cols]
     
     # Sector Chart (for Buy signals)
     buys = df_signals[df_signals['Signal'] == 'Buy']
