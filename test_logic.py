@@ -103,7 +103,22 @@ class TestPortfolioLogic(unittest.TestCase):
         # L1 (Small): (100 + 50 + 50) / 3 = 200/3 = 66.66...
         # L2 (Small): (50 + 100 + 100) / 3 = 250/3 = 83.33...
         l1_score_s = scored_v3_small.loc[scored_v3_small['Ticker']=='L1', 'VIP_Score'].values[0]
-        self.assertAlmostEqual(l1_score_s, 66.66666666666667)
+        # Rounded to 1 decimal: 66.7
+        self.assertEqual(l1_score_s, 66.7)
+
+    def test_weighting_type(self):
+        data = pd.DataFrame({
+            'Ticker': ['S1', 'L1'],
+            'MarketCap': [1e9, 10e9],
+            'BookValue': [5e8, 5e9],
+            'AssetGrowth': [0.1, 0.1],
+            'GrossProfit': [1e8, 1e9],
+            'TotalAssets': [5e8, 5e9],
+            'Momentum': [0.1, 0.1]
+        })
+        scored = calculate_scores(data)
+        self.assertEqual(scored.loc[scored['Ticker']=='S1', 'Weighting_Type'].values[0], "Pondération 1/N")
+        self.assertEqual(scored.loc[scored['Ticker']=='L1', 'Weighting_Type'].values[0], "Pondération Custom")
         
     def test_strategy_signals(self):
         scored = calculate_scores(self.sample_data)

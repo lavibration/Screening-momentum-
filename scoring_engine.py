@@ -57,4 +57,11 @@ def calculate_scores(df: pd.DataFrame) -> pd.DataFrame:
     # Final Rank of VIP Score
     df['VIP_Rank'] = df['VIP_Score'].rank(pct=True) * 100
     
+    # Weighting classification
+    df['Weighting_Type'] = np.where(df['MarketCap'] > threshold, "Pondération Custom", "Pondération 1/N")
+
+    # Rounding to 1 decimal place for all ranks and score
+    cols_to_round = ['Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'VIP_Score', 'VIP_Rank']
+    df[cols_to_round] = df[cols_to_round].round(1)
+
     return df
