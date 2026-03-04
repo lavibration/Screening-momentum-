@@ -125,8 +125,16 @@ def update_ui(data, buy_th, exit_th, mom_th):
     df_signals = generate_signals(df, buy_vip_threshold=buy_th, exit_vip_threshold=exit_th, exit_momentum_threshold=mom_th)
     
     # Table columns
-    display_cols = ['Ticker', 'Name', 'Signal', 'VIP_Rank', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'Sector', 'Price']
-    cols = [{"name": i, "id": i} for i in display_cols]
+    display_cols = ['Ticker', 'Name', 'Signal', 'Weighting_Type', 'VIP_Rank', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'Sector', 'Price']
+
+    hideable_cols = ['Inv_Rank', 'Prof_Rank', 'Momentum_Rank']
+
+    cols = []
+    for i in display_cols:
+        col_def = {"name": i, "id": i}
+        if i in hideable_cols:
+            col_def["hideable"] = True
+        cols.append(col_def)
     
     # Sector Chart (for Buy signals)
     buys = df_signals[df_signals['Signal'] == 'Buy']

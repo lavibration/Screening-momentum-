@@ -120,7 +120,10 @@ def get_financial_metrics(data_dict):
         except Exception as e:
             print(f"Error processing {ticker}: {e}")
             
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df['Price'] = df['Price'].round(2)
+    return df
 
 if __name__ == "__main__":
     # Test with a few tickers
