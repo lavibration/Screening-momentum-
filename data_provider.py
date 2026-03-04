@@ -15,16 +15,22 @@ def get_cac40_tickers() -> List[str]:
 
 def get_cac_mid_tickers() -> List[str]:
     """Returns representative tickers for the CAC Mid 60 components."""
+    # Based on Mid.jpg and typical CAC Mid 60 components
     return [
-        "ADP.PA", "AF.PA", "ALTE.PA", "APAM.PA", "ATO.PA", "ELIS.PA", "IPN.PA", "NK.PA",
-        "DEC.PA", "NEOEN.PA", "RUI.PA", "SEB.PA", "SK.PA", "SPIE.PA", "VRLA.PA", "VK.PA"
+        "ABVX.PA", "ELIS.PA", "AYV.PA", "IPN.PA", "COV.PA", "FDJU.PA", "RF.PA", "BOL.PA",
+        "RUI.PA", "VK.PA", "MF.PA", "FRVIA.PA", "SOP.PA", "ATE.PA", "SESG.PA", "VU.PA",
+        "SOLB.PA", "VIV.PA", "AF.PA", "APAM.PA", "ADP.PA", "ALT.PA", "ATO.PA", "BVI.PA",
+        "DEC.PA", "ERF.PA", "GFT.PA", "ICADE.PA", "IMB.PA", "JCD.PA", "KORI.PA", "LSS.PA",
+        "NK.PA", "POM.PA", "RCO.PA", "SEB.PA", "SPIE.PA", "UBI.PA", "VALLO.PA", "VRLA.PA"
     ]
 
 def get_cac_small_tickers() -> List[str]:
     """Returns representative tickers for the CAC Small components."""
     return [
-        "ABCA.PA", "AKW.PA", "BENE.PA", "BIG.PA", "BON.PA", "CRI.PA", "LISI.PA", "MMT.PA",
-        "VALN.PA", "GFC.PA", "DBV.PA", "ARG.PA"
+        "COFA.PA", "SK.PA", "VIRP.PA", "TRI.PA", "FII.PA", "IDL.PA", "VCT.PA", "IPS.PA",
+        "EMEIS.PA", "EXENS.PA", "PLX.PA", "CARM.PA", "MERY.PA", "ABCA.PA", "AKW.PA",
+        "ALM.PA", "BENE.PA", "BIG.PA", "BON.PA", "CATG.PA", "CRI.PA", "DBV.PA", "EOS.PA",
+        "GFC.PA", "LISI.PA", "MMT.PA", "NRO.PA", "PGU.PA", "ROTH.PA", "SMCP.PA", "VALN.PA"
     ]
 
 def fetch_data(tickers: List[str]):
@@ -80,6 +86,13 @@ def get_financial_metrics(data_dict):
             total_assets = bs.loc['Total Assets', latest_bs_col] if 'Total Assets' in bs.index else None
             gross_profit = inc.loc['Gross Profit', latest_inc_col] if 'Gross Profit' in inc.index else None
             
+            # Additional fields for the new Profitability formula
+            revenue = inc.loc['Total Revenue', latest_inc_col] if 'Total Revenue' in inc.index else None
+            cogs = inc.loc['Cost Of Revenue', latest_inc_col] if 'Cost Of Revenue' in inc.index else 0
+            sga = inc.loc['Selling General And Administration', latest_inc_col] if 'Selling General And Administration' in inc.index else 0
+            interest_expense = inc.loc['Interest Expense', latest_inc_col] if 'Interest Expense' in inc.index else 0
+            minority_interest = bs.loc['Minority Interest', latest_bs_col] if 'Minority Interest' in bs.index else 0
+
             # Book Value can be 'Stockholders Equity' or 'Total Stockholders Equity'
             book_value = None
             for label in ['Stockholders Equity', 'Total Stockholders Equity']:
@@ -94,7 +107,7 @@ def get_financial_metrics(data_dict):
                 if prev_total_assets != 0:
                     asset_growth = (total_assets - prev_total_assets) / prev_total_assets
                 
-            # Momentum: 12m - 1m
+            # Momentum: r(12, 1) - excludes the most recent month
             # Price 1 month ago (approx 21 trading days)
             p_now = hist['Close'].iloc[-1]
             p_1m = hist['Close'].iloc[-22] if len(hist) > 22 else None
@@ -103,6 +116,7 @@ def get_financial_metrics(data_dict):
             
             momentum = None
             if p_1m is not None and p_12m is not None and p_12m != 0:
+                # User specifically requested r(12,1): cumulative 12-month return excluding the most recent month
                 momentum = (p_1m - p_12m) / p_12m
                 
             rows.append({
@@ -112,6 +126,11 @@ def get_financial_metrics(data_dict):
                 "Price": p_now,
                 "TotalAssets": total_assets,
                 "GrossProfit": gross_profit,
+                "Revenue": revenue,
+                "COGS": cogs,
+                "SGA": sga,
+                "InterestExpense": interest_expense,
+                "MinorityInterest": minority_interest,
                 "BookValue": book_value,
                 "AssetGrowth": asset_growth,
                 "Momentum": momentum,

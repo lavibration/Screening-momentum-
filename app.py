@@ -127,7 +127,7 @@ def update_ui(data, buy_th, exit_th, mom_th):
     # Table columns
     display_cols = ['Ticker', 'Name', 'Signal', 'Weighting_Type', 'VIP_Rank', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'Sector', 'Price']
 
-    hideable_cols = ['Inv_Rank', 'Prof_Rank', 'Momentum_Rank']
+    hideable_cols = ['Weighting_Type', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'Sector', 'Price']
 
     cols = []
     for i in display_cols:

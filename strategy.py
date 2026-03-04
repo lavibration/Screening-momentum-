@@ -15,10 +15,10 @@ def generate_signals(df: pd.DataFrame, buy_vip_threshold: float = 80, exit_vip_t
     signals = []
     for _, row in df.iterrows():
         # Buy Condition
-        if row['Momentum_Rank'] > 50 and row['VIP_Rank'] >= buy_vip_threshold:
+        if row['Momentum_Rank'] >= 50 and row['VIP_Rank'] >= buy_vip_threshold:
             signal = "Buy"
-        # Sell Condition
-        elif row['VIP_Rank'] < exit_vip_threshold or row['Momentum_Rank'] <= exit_momentum_threshold:
+        # Sell Condition: VIP below exit OR Momentum below 50 (as per latest request)
+        elif row['VIP_Rank'] < exit_vip_threshold or row['Momentum_Rank'] < 50:
             signal = "Sell"
         else:
             signal = "Hold"
