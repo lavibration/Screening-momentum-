@@ -96,7 +96,118 @@ def create_layout():
         dcc.Store(id='full-data-store')
     ], fluid=True)
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
+
+def create_layout():
+    return dbc.Container([
+        dbc.Row([
+            dbc.Col(html.H1("Multivariate Factor Scoring Portfolio", className="text-center my-4 text-primary"), width=12)
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Configurations", className="mb-0")),
+                    dbc.CardBody([
+                        html.Label("Sélection de l'indice"),
+                        dbc.RadioItems(
+                            id="index-selector",
+                            options=[
+                                {"label": "CAC 40", "value": "cac40"},
+                                {"label": "CAC Mid 60", "value": "cacmid"},
+                                {"label": "CAC Small", "value": "cacsmall"},
+                            ],
+                            value="cac40",
+                            className="mb-3"
+                        ),
+
+                        html.Label("Seuil d'achat VIP (Top X%)"),
+                        dcc.Slider(id='buy-threshold', min=50, max=100, step=5, value=80, marks={i: str(i) for i in range(50, 101, 10)}),
+
+                        html.Label("Seuil de sortie VIP"),
+                        dcc.Slider(id='exit-threshold', min=0, max=80, step=5, value=50, marks={i: str(i) for i in range(0, 81, 10)}),
+
+                        html.Label("Colonnes de Score à afficher", className="mt-3"),
+                        dcc.Checklist(
+                            id='column-selector',
+                            options=[
+                                {'label': ' Value Rank', 'value': 'Value_Rank'},
+                                {'label': ' Investment Rank', 'value': 'Inv_Rank'},
+                                {'label': ' Profitability Rank', 'value': 'Prof_Rank'},
+                                {'label': ' Momentum Rank', 'value': 'Momentum_Rank'},
+                            ],
+                            value=['Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank'],
+                            labelStyle={'display': 'block'}
+                        ),
+
+                        dbc.Button("Rafraîchir les données", id='refresh-btn', color="primary", className="mt-3 w-100 shadow-sm"),
+                        dcc.Loading(id="loading-1", type="circle", children=html.Div(id="loading-output", className="text-muted small mt-2")),
+                    ])
+                ], className="shadow-sm mb-4")
+            ], md=3),
+
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Signaux et Classement VIP", className="mb-0")),
+                    dbc.CardBody([
+                        dash_table.DataTable(
+                            id='signals-table',
+                            columns=[],
+                            data=[],
+                            sort_action="native",
+                            filter_action="native",
+                            page_size=10,
+                            row_selectable='single',
+                            style_table={'overflowX': 'auto'},
+                            style_cell={'textAlign': 'left', 'fontFamily': 'inherit'},
+                            style_header={'backgroundColor': '#f8f9fa', 'fontWeight': 'bold'},
+                            style_data_conditional=[
+                                {
+                                    'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Buy"'},
+                                    'backgroundColor': '#d4edda', 'color': '#155724'
+                                },
+                                {
+                                    'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Sell"'},
+                                    'backgroundColor': '#f8d7da', 'color': '#721c24'
+                                },
+                                {
+                                    'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Données Insuffisantes"'},
+                                    'backgroundColor': '#dc3545', 'color': 'white'
+                                }
+                            ]
+                        ),
+                    ])
+                ], className="shadow-sm mb-4")
+            ], md=9)
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Analyse Détaillée", className="mb-0")),
+                    dbc.CardBody(id='detail-section')
+                ], className="shadow-sm mb-4")
+            ], width=12)
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Répartition Sectorielle", className="mb-0")),
+                    dbc.CardBody(dcc.Graph(id='sector-chart'))
+                ], className="shadow-sm")
+            ], md=6),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Performance Relative", className="mb-0")),
+                    dbc.CardBody(dcc.Graph(id='performance-chart'))
+                ], className="shadow-sm")
+            ], md=6)
+        ], className="mb-5"),
+
+        dcc.Store(id='full-data-store')
+    ], fluid=True)
+
 app.layout = create_layout()
 
 @app.callback(
@@ -165,7 +276,7 @@ def update_ui(data, buy_th, exit_th, selected_ranks):
 )
 def display_details(rows, selected_rows, buy_th, exit_th):
     if not selected_rows or rows is None:
-        return html.Div("Sélectionnez une ligne pour voir le détail des scores.")
+        return html.Div("Sélectionnez une ligne dans le tableau pour voir l'analyse détaillée.", className="text-muted text-center py-4")
 
     row = rows[selected_rows[0]]
 
@@ -173,13 +284,14 @@ def display_details(rows, selected_rows, buy_th, exit_th):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = row['VIP_Rank'],
-        title = {'text': f"Position VIP ({row['Ticker']})"},
+        title = {'text': f"Position VIP ({row['Ticker']})", 'font': {'size': 18}},
         gauge = {
-            'axis': {'range': [0, 100]},
+            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'bar': {'color': "#2c3e50"},
             'steps' : [
-                {'range': [0, exit_th], 'color': "lightcoral"},
-                {'range': [exit_th, buy_th], 'color': "lemonchiffon"},
-                {'range': [buy_th, 100], 'color': "lightgreen"}
+                {'range': [0, exit_th], 'color': "#f8d7da"},
+                {'range': [exit_th, buy_th], 'color': "#fff3cd"},
+                {'range': [buy_th, 100], 'color': "#d4edda"}
             ],
             'threshold' : {
                 'line': {'color': "red", 'width': 4},
@@ -187,19 +299,77 @@ def display_details(rows, selected_rows, buy_th, exit_th):
                 'value': buy_th}
         }
     ))
-    fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
+    fig.update_layout(height=250, margin=dict(l=30, r=30, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 
-    reliability_info = html.Div([
-        html.H5(f"Fiabilité des données : {row['Global_Rel']}"),
-        html.P(f"Valeur : {row['Rel_V']} | Investissement : {row['Rel_I']} | Profitabilité : {row['Rel_P']}")
-    ])
+    # Reliability Indicators
+    def get_rel_badge(val):
+        color = "success" if val == 1.0 else "warning" if val == 0.5 else "danger"
+        return dbc.Badge(f"{val}", color=color, className="ms-1")
 
-    return html.Div([
+    reliability_content = html.Div([
+        html.H5(["Fiabilité Globale: ", get_rel_badge(row['Global_Rel'])], className="mb-3"),
+        html.Div([
+            html.P(["Valeur: ", get_rel_badge(row['Rel_V'])], className="mb-1"),
+            html.P(["Investissement: ", get_rel_badge(row['Rel_I'])], className="mb-1"),
+            html.P(["Profitabilité: ", get_rel_badge(row['Rel_P'])], className="mb-1"),
+        ], className="small")
+    ], className="p-3 border rounded bg-light h-100")
+
+    # Tab 1: Visual Analysis
+    tab1_content = dbc.Row([
+        dbc.Col(reliability_content, md=4),
+        dbc.Col(dcc.Graph(figure=fig), md=8)
+    ], className="mt-3")
+
+    # Tab 2: Fundamental Details
+    # Identify missing data
+    essential_fields = {
+        'PB': 'P/B', 'PE': 'P/E', 'FCF_Yield': 'FCF Yield',
+        'TotalAssets': 'Total Assets', 'PrevTotalAssets': 'Prev Total Assets',
+        'Revenue': 'Chiffre d\'Affaires', 'BookEquity': 'Capitaux Propres'
+    }
+    missing = [name for field, name in essential_fields.items() if pd.isna(row.get(field))]
+
+    missing_alert = ""
+    if missing:
+        missing_alert = dbc.Alert([
+            html.I(className="bi bi-exclamation-triangle-fill me-2"),
+            f"Données manquantes : {', '.join(missing)}"
+        ], color="danger", className="mt-2 small py-1")
+
+    def fmt(val, is_pct=False):
+        if val is None or pd.isna(val): return "N/A"
+        if is_pct: return f"{val*100:.2f}%"
+        return f"{val:,.2f}"
+
+    fundamental_content = html.Div([
         dbc.Row([
-            dbc.Col(reliability_info, md=6),
-            dbc.Col(dcc.Graph(figure=fig), md=6)
-        ])
-    ])
+            dbc.Col([
+                html.H6("Valorisation (Value)", className="text-primary border-bottom pb-1"),
+                html.P(f"P/B : {fmt(row.get('PB'))}"),
+                html.P(f"P/E : {fmt(row.get('PE'))}"),
+                html.P(f"FCF Yield : {fmt(row.get('FCF_Yield'), True)}"),
+            ], md=4),
+            dbc.Col([
+                html.H6("Bilan & Profitabilité", className="text-primary border-bottom pb-1"),
+                html.P(f"Assets Growth : {fmt((row.get('TotalAssets',0)-row.get('PrevTotalAssets',0))/row.get('PrevTotalAssets',1) if row.get('PrevTotalAssets') else None, True)}"),
+                html.P(f"Revenue : {fmt(row.get('Revenue'))}"),
+                html.P(f"Equity : {fmt(row.get('BookEquity'))}"),
+            ], md=4),
+            dbc.Col([
+                html.H6("Performance", className="text-primary border-bottom pb-1"),
+                html.P(f"Perf 12m : {fmt(row.get('Perf_12m'), True)}"),
+                html.P(f"Momentum r(12,1) : {fmt(row.get('Momentum'), True)}"),
+                html.P(f"Market Cap : {fmt(row.get('MarketCap'))}"),
+            ], md=4),
+        ], className="mt-3"),
+        missing_alert
+    ], className="p-3")
+
+    return dbc.Tabs([
+        dbc.Tab(tab1_content, label="Analyse Graphique", tab_id="tab-graph"),
+        dbc.Tab(fundamental_content, label="Détails Fondamentaux", tab_id="tab-fund"),
+    ], active_tab="tab-graph")
 
 if __name__ == "__main__":
     app.run(debug=True, port=8050)
