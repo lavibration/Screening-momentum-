@@ -3,83 +3,96 @@ import numpy as np
 
 def calculate_scores(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates Value, Investment, Profitability and Momentum ranks and the VIP score.
+    Calculates Value, Investment, Profitability scores with robustness rules and reliability indices.
     """
     if df.empty:
         return df
         
-    # Copy to avoid side effects
     df = df.copy()
     
-    # Fill NaN values for essential columns
-    df['BookValue'] = df['BookValue'].fillna(0)
-    df['MarketCap'] = df['MarketCap'].fillna(1e6) # Small cap if unknown
-    df['AssetGrowth'] = df['AssetGrowth'].fillna(0)
-
-    if 'GrossProfit' in df.columns:
-        df['GrossProfit'] = df['GrossProfit'].fillna(0)
-    else:
-        df['GrossProfit'] = 0
-
-    if 'TotalAssets' in df.columns:
-        df['TotalAssets'] = df['TotalAssets'].fillna(1)
-    else:
-        df['TotalAssets'] = 1
-
-    df['Momentum'] = df['Momentum'].fillna(0)
-
-    for col in ['Revenue', 'COGS', 'SGA', 'InterestExpense', 'MinorityInterest']:
-        if col in df.columns:
-            df[col] = df[col].fillna(0)
-        else:
-            df[col] = 0
-
-    # 1. Value: Book-to-Market (BookValue / MarketCap)
-    # MarketCap from info, BookValue from BS
-    df['Value'] = df['BookValue'] / df['MarketCap']
+    # 1. VALUE PILLAR (Composite)
+    # Rules: PB (asc), PE (asc), FCF Yield (desc). If Net Income < 0, Rank_PE = 0.
     
-    # 2. Investment: Asset Growth (calculated in data_provider)
-    # Already named 'AssetGrowth'
+    # Calculate Ranks
+    # PB Rank (Low is better -> Ascending=False)
+    df['PB_Rank'] = df['PB'].rank(pct=True, ascending=False, na_option='keep') * 100
     
-    # 3. Profitability: (Revenue - COGS - SG&A - Interests) / (Book Equity + Minority Interests)
-    # Using 'BookValue' as Book Equity
-    denom = df['BookValue'] + df['MinorityInterest']
-    # Avoid division by zero
-    df['Profitability'] = np.where(denom != 0, (df['Revenue'] - df['COGS'] - df['SGA'] - df['InterestExpense']) / denom, 0)
+    # PE Rank (Low is better -> Ascending=False)
+    df['PE_Rank_Raw'] = df['PE'].rank(pct=True, ascending=False, na_option='keep') * 100
+    df.loc[df['NetIncome'] < 0, 'PE_Rank_Raw'] = 0
     
-    # Normalisation: Rank 1 to 100
-    # Higher is better for Value and Profitability
-    df['Value_Rank'] = df['Value'].rank(pct=True) * 100
-    df['Prof_Rank'] = df['Profitability'].rank(pct=True) * 100
+    # FCF Yield Rank (High is better -> Ascending=True)
+    df['FCF_Yield_Rank'] = df['FCF_Yield'].rank(pct=True, ascending=True, na_option='keep') * 100
     
-    # Inverted rank for Investment: lower growth is better (rigorous balance sheet)
-    df['Inv_Rank'] = df['AssetGrowth'].rank(pct=True, ascending=False) * 100
+    # Value Robustness: Average of available percentiles
+    value_cols = ['PB_Rank', 'PE_Rank_Raw', 'FCF_Yield_Rank']
+    df['Value_Rank'] = df[value_cols].mean(axis=1)
     
-    # Momentum Rank (Condition Filter)
+    # Value Reliability
+    def get_value_rel(row):
+        available = row[value_cols].count()
+        if available == 3: return 1.0
+        if available > 0: return 0.5
+        return 0.0
+    df['Rel_V'] = df.apply(get_value_rel, axis=1)
+
+    # 2. INVESTMENT PILLAR
+    # Asset Growth (Variation in Total Assets)
+    df['AssetGrowth'] = (df['TotalAssets'] - df['PrevTotalAssets']) / df['PrevTotalAssets']
+
+    # Robustness: assign 50 if data is missing
+    df['Inv_Rank'] = df['AssetGrowth'].rank(pct=True, ascending=False, na_option='keep') * 100
+    # Reliability
+    df['Rel_I'] = 1.0
+    df.loc[df['TotalAssets'].isna() | df['PrevTotalAssets'].isna(), 'Rel_I'] = 0.0
+    # Fill missing with 50 (neutral) after ranking
+    df['Inv_Rank'] = df['Inv_Rank'].fillna(50)
+
+    # 3. PROFITABILITY PILLAR
+    # (Revenue - COGS - SGA - Int) / (Equity + Minority)
+    # Rules: Handle missing components, assign 50 if missing or aberrant
+    num = (df['Revenue'].fillna(0) - df['COGS'].fillna(0) - df['SGA'].fillna(0) - df['InterestExpense'].fillna(0))
+    den = (df['BookEquity'].fillna(0) + df['MinorityInterest'].fillna(0))
+
+    df['Profitability_Raw'] = np.where(den != 0, num / den, np.nan)
+
+    # Check for aberrant values
+    df['Profitability_Final'] = df['Profitability_Raw']
+    df.loc[df['Profitability_Final'].abs() > 2, 'Profitability_Final'] = np.nan
+    # Also if essential data is missing (Revenue or BookEquity), it's aberrant/missing
+    df.loc[df['Revenue'].isna() | df['BookEquity'].isna(), 'Profitability_Final'] = np.nan
+
+    df['Prof_Rank'] = df['Profitability_Final'].rank(pct=True, na_option='keep') * 100
+    # Reliability
+    def get_prof_rel(row):
+        if pd.isna(row['Revenue']) or pd.isna(row['BookEquity']): return 0.0
+        if pd.isna(row['COGS']) or pd.isna(row['SGA']) or pd.isna(row['InterestExpense']): return 0.5
+        return 1.0
+    df['Rel_P'] = df.apply(get_prof_rel, axis=1)
+    # Fill missing with 50 (neutral) after ranking
+    df['Prof_Rank'] = df['Prof_Rank'].fillna(50)
+
+    # GLOBAL RELIABILITY
+    df['Global_Rel'] = (df['Rel_V'] + df['Rel_I'] + df['Rel_P']) / 3.0
+
+    # MOMENTUM RANK
     df['Momentum_Rank'] = df['Momentum'].rank(pct=True) * 100
     
-    # Dynamic weighting based on Market Cap
-    # Seuil: 6 Mds €
-    threshold = 6e9
+    # DYNAMIC WEIGHTING
+    threshold_mktcap = 6e9
 
     def compute_vip(row):
-        if row['MarketCap'] > threshold:
-            # For large caps, overweight Investment and Profitability
+        if row['MarketCap'] > threshold_mktcap:
             return 0.2 * row['Value_Rank'] + 0.5 * row['Inv_Rank'] + 0.3 * row['Prof_Rank']
         else:
-            # 1/N for smaller caps
             return (row['Value_Rank'] + row['Inv_Rank'] + row['Prof_Rank']) / 3.0
 
+    df['Weighting_Type'] = np.where(df['MarketCap'] > threshold_mktcap, "Pondération Custom", "Pondération 1/N")
     df['VIP_Score'] = df.apply(compute_vip, axis=1)
-    
-    # Final Rank of VIP Score
     df['VIP_Rank'] = df['VIP_Score'].rank(pct=True) * 100
     
-    # Weighting classification
-    df['Weighting_Type'] = np.where(df['MarketCap'] > threshold, "Pondération Custom", "Pondération 1/N")
-
-    # Rounding to 1 decimal place for all ranks and score
-    cols_to_round = ['Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'VIP_Score', 'VIP_Rank']
+    # Rounding
+    cols_to_round = ['Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank', 'VIP_Score', 'VIP_Rank', 'Global_Rel']
     df[cols_to_round] = df[cols_to_round].round(1)
 
     return df
