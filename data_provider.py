@@ -4,7 +4,6 @@ from typing import List
 
 def get_cac40_tickers() -> List[str]:
     """Returns a list of Yahoo Finance tickers for the CAC 40 components."""
-    # Simplified list for initial testing/dev
     return [
         "AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA",
         "CAP.PA", "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EDEN.PA", "ENGI.PA", "EL.PA",
@@ -47,6 +46,7 @@ def fetch_data(tickers: List[str]):
             # Fundamentals
             bs = stock.balance_sheet
             inc = stock.financials
+            cf = stock.cashflow
             
             if bs is None or bs.empty or inc is None or inc.empty:
                 print(f"Warning: No fundamental data for {ticker}")
@@ -58,6 +58,7 @@ def fetch_data(tickers: List[str]):
             data[ticker] = {
                 "balance_sheet": bs,
                 "financials": inc,
+                "cashflow": cf,
                 "history": hist,
                 "info": stock.info
             }
@@ -75,49 +76,53 @@ def get_financial_metrics(data_dict):
         try:
             bs = d["balance_sheet"]
             inc = d["financials"]
+            cf = d["cashflow"]
             hist = d["history"]
             info = d["info"]
             
             # Get latest available columns (most recent)
             latest_bs_col = bs.columns[0]
             latest_inc_col = inc.columns[0]
+            latest_cf_col = cf.columns[0] if not cf.empty else None
             prev_bs_col = bs.columns[1] if len(bs.columns) > 1 else None
             
-            # Note: yfinance indices can vary slightly. We use .get or check existence.
-            total_assets = bs.loc['Total Assets', latest_bs_col] if 'Total Assets' in bs.index else None
-            gross_profit = inc.loc['Gross Profit', latest_inc_col] if 'Gross Profit' in inc.index else None
-            
-            # Additional fields for the new Profitability formula
-            revenue = inc.loc['Total Revenue', latest_inc_col] if 'Total Revenue' in inc.index else None
-            cogs = inc.loc['Cost Of Revenue', latest_inc_col] if 'Cost Of Revenue' in inc.index else 0
-            sga = inc.loc['Selling General And Administration', latest_inc_col] if 'Selling General And Administration' in inc.index else 0
-            interest_expense = inc.loc['Interest Expense', latest_inc_col] if 'Interest Expense' in inc.index else 0
-            minority_interest = bs.loc['Minority Interest', latest_bs_col] if 'Minority Interest' in bs.index else 0
+            # 1. VALUE Components
+            pb = info.get('priceToBook')
+            pe = info.get('trailingPE')
+            if pe is None:
+                pe = info.get('forwardPE')
 
-            # Book Value can be 'Stockholders Equity' or 'Total Stockholders Equity'
-            book_value = None
+            fcf = info.get('freeCashflow')
+            mkt_cap = info.get('marketCap', 0)
+            fcf_yield = (fcf / mkt_cap) if (fcf is not None and mkt_cap > 0) else None
+
+            net_income = inc.loc['Net Income', latest_inc_col] if 'Net Income' in inc.index else None
+
+            # 2. INVESTMENT Components
+            total_assets = bs.loc['Total Assets', latest_bs_col] if 'Total Assets' in bs.index else None
+            prev_total_assets = bs.loc['Total Assets', prev_bs_col] if (prev_bs_col is not None and 'Total Assets' in bs.index) else None
+            
+            # 3. PROFITABILITY Components
+            revenue = inc.loc['Total Revenue', latest_inc_col] if 'Total Revenue' in inc.index else None
+            cogs = inc.loc['Cost Of Revenue', latest_inc_col] if 'Cost Of Revenue' in inc.index else None
+            sga = inc.loc['Selling General And Administration', latest_inc_col] if 'Selling General And Administration' in inc.index else None
+            interest_expense = inc.loc['Interest Expense', latest_inc_col] if 'Interest Expense' in inc.index else None
+
+            # Book Equity + Minority Interests
+            book_equity = None
             for label in ['Stockholders Equity', 'Total Stockholders Equity']:
                 if label in bs.index:
-                    book_value = bs.loc[label, latest_bs_col]
+                    book_equity = bs.loc[label, latest_bs_col]
                     break
+            minority_interest = bs.loc['Minority Interest', latest_bs_col] if 'Minority Interest' in bs.index else None
             
-            # Asset growth (Investment factor)
-            asset_growth = None
-            if prev_bs_col is not None and 'Total Assets' in bs.index:
-                prev_total_assets = bs.loc['Total Assets', prev_bs_col]
-                if prev_total_assets != 0:
-                    asset_growth = (total_assets - prev_total_assets) / prev_total_assets
-                
-            # Momentum: r(12, 1) - excludes the most recent month
-            # Price 1 month ago (approx 21 trading days)
+            # Momentum: r(12, 1)
             p_now = hist['Close'].iloc[-1]
             p_1m = hist['Close'].iloc[-22] if len(hist) > 22 else None
-            # Price 12 months ago (approx 252 trading days)
             p_12m = hist['Close'].iloc[-253] if len(hist) > 253 else None
             
             momentum = None
             if p_1m is not None and p_12m is not None and p_12m != 0:
-                # User specifically requested r(12,1): cumulative 12-month return excluding the most recent month
                 momentum = (p_1m - p_12m) / p_12m
                 
             rows.append({
@@ -125,17 +130,20 @@ def get_financial_metrics(data_dict):
                 "Name": info.get("longName", ticker),
                 "Sector": info.get("sector", "Unknown"),
                 "Price": p_now,
+                "MarketCap": mkt_cap,
+                "PB": pb,
+                "PE": pe,
+                "FCF_Yield": fcf_yield,
+                "NetIncome": net_income,
                 "TotalAssets": total_assets,
-                "GrossProfit": gross_profit,
+                "PrevTotalAssets": prev_total_assets,
                 "Revenue": revenue,
                 "COGS": cogs,
                 "SGA": sga,
                 "InterestExpense": interest_expense,
+                "BookEquity": book_equity,
                 "MinorityInterest": minority_interest,
-                "BookValue": book_value,
-                "AssetGrowth": asset_growth,
-                "Momentum": momentum,
-                "MarketCap": info.get("marketCap", 0)
+                "Momentum": momentum
             })
         except Exception as e:
             print(f"Error processing {ticker}: {e}")
@@ -144,10 +152,3 @@ def get_financial_metrics(data_dict):
     if not df.empty:
         df['Price'] = df['Price'].round(2)
     return df
-
-if __name__ == "__main__":
-    # Test with a few tickers
-    test_tickers = ["MC.PA", "ORA.PA", "TTE.PA"]
-    raw_data = fetch_data(test_tickers)
-    df = get_financial_metrics(raw_data)
-    print(df)
