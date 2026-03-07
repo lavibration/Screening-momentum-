@@ -15,22 +15,23 @@ def get_cac40_tickers() -> List[str]:
 
 def get_cac_mid_tickers() -> List[str]:
     """Returns representative tickers for the CAC Mid 60 components."""
-    # Based on Mid.jpg and typical CAC Mid 60 components
     return [
-        "ABVX.PA", "ELIS.PA", "AYV.PA", "IPN.PA", "COV.PA", "FDJU.PA", "RF.PA", "BOL.PA",
-        "RUI.PA", "VK.PA", "MF.PA", "FRVIA.PA", "SOP.PA", "ATE.PA", "SESG.PA", "VU.PA",
-        "SOLB.PA", "VIV.PA", "AF.PA", "APAM.PA", "ADP.PA", "ALT.PA", "ATO.PA", "BVI.PA",
-        "DEC.PA", "ERF.PA", "GFT.PA", "ICADE.PA", "IMB.PA", "JCD.PA", "KORI.PA", "LSS.PA",
-        "NK.PA", "POM.PA", "RCO.PA", "SEB.PA", "SPIE.PA", "UBI.PA", "VALLO.PA", "VRLA.PA"
+        "ALTA.PA", "ATE.PA", "AMUN.PA", "ANTIN.PA", "APAM.PA", "ATO.PA", "BEN.PA", "BB.PA",
+        "BOL.PA", "CARM.PA", "CO.PA", "COFA.PA", "COV.PA", "AM.PA", "DBG.PA", "ELIOR.PA",
+        "ELIS.PA", "ERA.PA", "RF.PA", "EAPI.PA", "ETL.PA", "FNAC.PA", "GTT.PA", "ICAD.PA",
+        "IDL.PA", "NK.PA", "ITP.PA", "IPN.PA", "IPS.PA", "DEC.PA", "MERY.PA", "MRN.PA",
+        "MMT.PA", "NEX.PA", "NXI.PA", "RUI.PA", "SK.PA", "SCR.PA", "SESG.PA", "SOI.PA",
+        "S30.PA", "SOP.PA", "SPIE.PA", "TE.PA", "TFI.PA", "TRI.PA", "VK.PA", "VLA.PA",
+        "VRLA.PA", "VIRP.PA", "VLTSA.PA", "MF.PA"
     ]
 
 def get_cac_small_tickers() -> List[str]:
     """Returns representative tickers for the CAC Small components."""
     return [
-        "COFA.PA", "SK.PA", "VIRP.PA", "TRI.PA", "FII.PA", "IDL.PA", "VCT.PA", "IPS.PA",
-        "EMEIS.PA", "EXENS.PA", "PLX.PA", "CARM.PA", "MERY.PA", "ABCA.PA", "AKW.PA",
-        "ALM.PA", "BENE.PA", "BIG.PA", "BON.PA", "CATG.PA", "CRI.PA", "DBV.PA", "EOS.PA",
-        "GFC.PA", "LISI.PA", "MMT.PA", "NRO.PA", "PGU.PA", "ROTH.PA", "SMCP.PA", "VALN.PA"
+        "ABVX.PA", "AYV.PA", "FDJU.PA", "FRVIA.PA", "VU.PA", "SOLB.PA", "VIV.PA", "AF.PA",
+        "FII.PA", "VCT.PA", "EMEIS.PA", "EXENS.PA", "PLX.PA", "ABCA.PA", "AKW.PA", "ALM.PA",
+        "BENE.PA", "BIG.PA", "BON.PA", "CATG.PA", "CRI.PA", "DBV.PA", "EOS.PA", "GFC.PA",
+        "LISI.PA", "NRO.PA", "PGU.PA", "ROTH.PA", "SMCP.PA", "VALN.PA"
     ]
 
 def fetch_data(tickers: List[str]):
