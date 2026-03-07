@@ -15,9 +15,24 @@ def calculate_scores(df: pd.DataFrame) -> pd.DataFrame:
     df['BookValue'] = df['BookValue'].fillna(0)
     df['MarketCap'] = df['MarketCap'].fillna(1e6) # Small cap if unknown
     df['AssetGrowth'] = df['AssetGrowth'].fillna(0)
-    df['GrossProfit'] = df['GrossProfit'].fillna(0)
-    df['TotalAssets'] = df['TotalAssets'].fillna(1)
+
+    if 'GrossProfit' in df.columns:
+        df['GrossProfit'] = df['GrossProfit'].fillna(0)
+    else:
+        df['GrossProfit'] = 0
+
+    if 'TotalAssets' in df.columns:
+        df['TotalAssets'] = df['TotalAssets'].fillna(1)
+    else:
+        df['TotalAssets'] = 1
+
     df['Momentum'] = df['Momentum'].fillna(0)
+
+    for col in ['Revenue', 'COGS', 'SGA', 'InterestExpense', 'MinorityInterest']:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
+        else:
+            df[col] = 0
 
     # 1. Value: Book-to-Market (BookValue / MarketCap)
     # MarketCap from info, BookValue from BS
@@ -26,8 +41,11 @@ def calculate_scores(df: pd.DataFrame) -> pd.DataFrame:
     # 2. Investment: Asset Growth (calculated in data_provider)
     # Already named 'AssetGrowth'
     
-    # 3. Profitability: Gross Profit / Total Assets
-    df['Profitability'] = df['GrossProfit'] / df['TotalAssets']
+    # 3. Profitability: (Revenue - COGS - SG&A - Interests) / (Book Equity + Minority Interests)
+    # Using 'BookValue' as Book Equity
+    denom = df['BookValue'] + df['MinorityInterest']
+    # Avoid division by zero
+    df['Profitability'] = np.where(denom != 0, (df['Revenue'] - df['COGS'] - df['SGA'] - df['InterestExpense']) / denom, 0)
     
     # Normalisation: Rank 1 to 100
     # Higher is better for Value and Profitability

@@ -11,8 +11,14 @@ class TestPortfolioLogic(unittest.TestCase):
             'MarketCap': [1000, 1000, 1000, 1000],
             'BookValue': [100, 200, 300, 400], # Value Ranks: 25, 50, 75, 100
             'AssetGrowth': [0.1, 0.05, 0.15, 0.2], # Inv Ranks: 50, 100, 25, 0 (ascending=False)
-            'GrossProfit': [200, 200, 200, 200],
-            'TotalAssets': [1000, 800, 1200, 1000], # Prof: 0.2, 0.25, 0.166, 0.2 -> Ranks: 50, 100, 25, 50
+            'Revenue': [1000, 1000, 1000, 1000],
+            'COGS': [200, 200, 200, 200],
+            'SGA': [100, 100, 100, 100],
+            'InterestExpense': [50, 50, 50, 50],
+            'MinorityInterest': [0, 0, 0, 0],
+            # Profitability = (1000 - 200 - 100 - 50) / (BookValue + 0) = 650 / BookValue
+            # A: 6.5, B: 3.25, C: 2.166, D: 1.625
+            # Prof Ranks: 100, 75, 50, 25
             'Momentum': [0.1, 0.2, 0.05, -0.1] # Mom Ranks: 50, 100, 25, 0
         })
 
@@ -46,47 +52,31 @@ class TestPortfolioLogic(unittest.TestCase):
             'MarketCap': [10e9],
             'BookValue': [5e9],
             'AssetGrowth': [0.1],
-            'GrossProfit': [1e9],
-            'TotalAssets': [5e9],
+            'Revenue': [2e9],
+            'COGS': [1e9],
+            'SGA': [2e8],
+            'InterestExpense': [1e8],
+            'MinorityInterest': [0],
             'Momentum': [0.1]
         })
         scored_large = calculate_scores(large_cap_data)
         # 0.2 * 100 + 0.5 * 100 + 0.3 * 100 = 100
+        self.assertAlmostEqual(scored_large.iloc[0]['VIP_Score'], 100.0)
+
         # To really test weighting, we need different ranks. Let's use two rows.
-        multi_data = pd.DataFrame({
-            'Ticker': ['L1', 'L2'],
-            'MarketCap': [10e9, 10e9],
-            'BookValue': [1e9, 2e9], # L2 better Value
-            'AssetGrowth': [0.05, 0.1], # L1 better Investment (lower growth)
-            'GrossProfit': [1e8, 5e8], # L2 better Profitability
-            'TotalAssets': [1e9, 1e9],
-            'Momentum': [0.1, 0.1]
-        })
-        # L1: Value_Rank=50, Inv_Rank=100, Prof_Rank=50
-        # L2: Value_Rank=100, Inv_Rank=50, Prof_Rank=100
-
-        # Expected VIP_Score for L1 (Large Cap): 0.2*50 + 0.5*100 + 0.3*50 = 10 + 50 + 15 = 75
-        # Expected VIP_Score for L2 (Large Cap): 0.2*100 + 0.5*50 + 0.3*100 = 20 + 25 + 30 = 75
-        # (Wait, let's pick different values to distinguish)
-
-        multi_data_v2 = pd.DataFrame({
-            'Ticker': ['L1', 'L2'],
-            'MarketCap': [10e9, 10e9],
-            'BookValue': [1e9, 2e9], # L1: 50, L2: 100
-            'AssetGrowth': [0.1, 0.05], # L1: 50, L2: 100
-            'GrossProfit': [1e8, 5e8], # L1: 50, L2: 100
-            'TotalAssets': [1e9, 1e9],
-            'Momentum': [0.1, 0.1]
-        })
-        # If weights were equal, both would have scores relative to their ranks.
-        # Let's use a more complex one.
         multi_data_v3 = pd.DataFrame({
             'Ticker': ['L1', 'L2'],
             'MarketCap': [10e9, 10e9],
             'BookValue': [2e9, 1e9], # L1: 100, L2: 50 (Value)
             'AssetGrowth': [0.1, 0.05], # L1: 50, L2: 100 (Investment)
-            'GrossProfit': [1e8, 5e8], # L1: 50, L2: 100 (Profitability)
-            'TotalAssets': [1e9, 1e9],
+            # We want Prof_Rank L1: 50, L2: 100
+            'Revenue': [1e9, 2e9],
+            'COGS': [0, 0],
+            'SGA': [0, 0],
+            'InterestExpense': [0, 0],
+            'MinorityInterest': [0, 0],
+            # Prof L1 = 1e9 / 2e9 = 0.5
+            # Prof L2 = 2e9 / 1e9 = 2.0
             'Momentum': [0.1, 0.1]
         })
         scored_v3 = calculate_scores(multi_data_v3)
@@ -122,17 +112,30 @@ class TestPortfolioLogic(unittest.TestCase):
         
     def test_strategy_signals(self):
         scored = calculate_scores(self.sample_data)
-        print("\nScored data in test:")
-        print(scored[['Ticker', 'Momentum_Rank', 'VIP_Rank']])
-        # B should be a Buy (Mom_Rank=100, High VIP)
-        # D should be a Sell (Mom_Rank low)
-        signals = generate_signals(scored, buy_vip_threshold=50, exit_momentum_threshold=30)
+        # Scored output for sample data:
+        # Ticker  Momentum_Rank  VIP_Rank  Signal (expected)
+        # A       75.0           75.0      Hold
+        # B       100.0          100.0     Buy
+        # C       50.0           50.0      Hold
+        # D       25.0           25.0      Sell
+
+        # Buy Condition: Mom_Rank >= 50 AND VIP_Rank >= 80
+        # Sell Condition: VIP_Rank < 50 OR Mom_Rank < 50
+
+        signals = generate_signals(scored, buy_vip_threshold=80, exit_vip_threshold=50)
         
         b_signal = signals.loc[signals['Ticker'] == 'B', 'Signal'].values[0]
+        c_signal = signals.loc[signals['Ticker'] == 'C', 'Signal'].values[0]
         d_signal = signals.loc[signals['Ticker'] == 'D', 'Signal'].values[0]
+        a_signal = signals.loc[signals['Ticker'] == 'A', 'Signal'].values[0]
         
         self.assertEqual(b_signal, "Buy")
+        # For C: VIP_Rank=50, Mom_Rank=50 -> Hold
+        self.assertEqual(c_signal, "Hold")
+        # For D: VIP_Rank=25 (< 50), Mom_Rank=25 (< 50) -> Sell
         self.assertEqual(d_signal, "Sell")
+        # For A: VIP_Rank=75 (< 80), Mom_Rank=75 (>= 50) -> Hold
+        self.assertEqual(a_signal, "Hold")
 
 if __name__ == '__main__':
     unittest.main()
