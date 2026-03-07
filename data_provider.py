@@ -101,7 +101,7 @@ def get_financial_metrics(data_dict):
             # 2. INVESTMENT Components
             total_assets = bs.loc['Total Assets', latest_bs_col] if 'Total Assets' in bs.index else None
             prev_total_assets = bs.loc['Total Assets', prev_bs_col] if (prev_bs_col is not None and 'Total Assets' in bs.index) else None
-            
+
             # 3. PROFITABILITY Components
             revenue = inc.loc['Total Revenue', latest_inc_col] if 'Total Revenue' in inc.index else None
             cogs = inc.loc['Cost Of Revenue', latest_inc_col] if 'Cost Of Revenue' in inc.index else None
@@ -125,11 +125,17 @@ def get_financial_metrics(data_dict):
             if p_1m is not None and p_12m is not None and p_12m != 0:
                 momentum = (p_1m - p_12m) / p_12m
                 
+            perf_12m = None
+            if p_12m is not None and p_12m != 0:
+                perf_12m = (p_now - p_12m) / p_12m
+
             rows.append({
                 "Ticker": ticker,
                 "Name": info.get("longName", ticker),
                 "Sector": info.get("sector", "Unknown"),
                 "Price": p_now,
+                "Price_12m": p_12m,
+                "Perf_12m": perf_12m,
                 "MarketCap": mkt_cap,
                 "PB": pb,
                 "PE": pe,
