@@ -20,7 +20,13 @@ def generate_signals(df: pd.DataFrame, buy_vip_threshold: float = 80, exit_vip_t
             signal = "Données Insuffisantes"
         # Buy Condition
         elif row['Momentum_Rank'] >= 50 and row['VIP_Rank'] >= buy_vip_threshold:
-            signal = "Buy"
+            # Optimal entry check
+            if row['VAL'] <= row['Price'] <= row['POC']:
+                signal = "Buy (ENTRÉE OPTIMALE)"
+            elif row['Price'] > row['VAH']:
+                signal = "Buy (ATTENTE / SUR-ACHAT)"
+            else:
+                signal = "Buy"
         # Sell Condition: VIP below exit OR Momentum below 50
         elif row['VIP_Rank'] < exit_vip_threshold or row['Momentum_Rank'] < 50:
             signal = "Sell"

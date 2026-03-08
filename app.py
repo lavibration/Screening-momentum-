@@ -163,7 +163,7 @@ def create_layout():
                             style_header={'backgroundColor': '#f8f9fa', 'fontWeight': 'bold'},
                             style_data_conditional=[
                                 {
-                                    'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Buy"'},
+                                    'if': {'column_id': 'Signal', 'filter_query': '{Signal} contains "Buy"'},
                                     'backgroundColor': '#d4edda', 'color': '#155724'
                                 },
                                 {
@@ -173,6 +173,18 @@ def create_layout():
                                 {
                                     'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Données Insuffisantes"'},
                                     'backgroundColor': '#dc3545', 'color': 'white'
+                                },
+                                {
+                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} eq "Prix de Gros"'},
+                                    'color': '#28a745', 'fontWeight': 'bold'
+                                },
+                                {
+                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} eq "Prix de Détail"'},
+                                    'color': '#fd7e14', 'fontWeight': 'bold'
+                                },
+                                {
+                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} eq "Extension Haute"'},
+                                    'color': '#dc3545', 'fontWeight': 'bold'
                                 }
                             ]
                         ),
@@ -250,7 +262,7 @@ def update_ui(data, buy_th, exit_th, selected_ranks):
     df = pd.DataFrame(data)
     df_signals = generate_signals(df, buy_vip_threshold=buy_th, exit_vip_threshold=exit_th)
 
-    base_cols = ['Ticker', 'Name', 'Signal', 'Global_Rel', 'VIP_Rank', 'Weighting_Type']
+    base_cols = ['Ticker', 'Name', 'Signal', 'Zone_Prix', 'Dist_POC', 'Global_Rel', 'VIP_Rank', 'Weighting_Type']
     end_cols = ['Price']
 
     display_cols = base_cols + selected_ranks + end_cols
@@ -357,11 +369,20 @@ def display_details(rows, selected_rows, buy_th, exit_th):
                 html.P(f"Equity : {fmt(row.get('BookEquity'))}"),
             ], md=4),
             dbc.Col([
+                html.H6("Timing (Volume Profile)", className="text-primary border-bottom pb-1"),
+                html.P(f"POC : {fmt(row.get('POC'))}"),
+                html.P(f"VAH : {fmt(row.get('VAH'))}"),
+                html.P(f"VAL : {fmt(row.get('VAL'))}"),
+                html.P(f"Dist. POC : {row.get('Dist_POC')}%", className="fw-bold"),
+            ], md=4),
+        ], className="mt-3"),
+        dbc.Row([
+            dbc.Col([
                 html.H6("Performance", className="text-primary border-bottom pb-1"),
                 html.P(f"Perf 12m : {fmt(row.get('Perf_12m'), True)}"),
                 html.P(f"Momentum r(12,1) : {fmt(row.get('Momentum'), True)}"),
                 html.P(f"Market Cap : {fmt(row.get('MarketCap'))}"),
-            ], md=4),
+            ], md=12),
         ], className="mt-3"),
         missing_alert
     ], className="p-3")
