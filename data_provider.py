@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 from typing import List
+from timing_engine import calculate_volume_profile, get_timing_status
 
 def get_cac40_tickers() -> List[str]:
     """Returns a list of Yahoo Finance tickers for the CAC 40 components."""
@@ -129,6 +130,10 @@ def get_financial_metrics(data_dict):
             if p_12m is not None and p_12m != 0:
                 perf_12m = (p_now - p_12m) / p_12m
 
+            # Volume Profile
+            poc, vah, val = calculate_volume_profile(hist)
+            zone_prix, dist_poc = get_timing_status(p_now, poc, vah, val)
+
             rows.append({
                 "Ticker": ticker,
                 "Name": info.get("longName", ticker),
@@ -149,7 +154,12 @@ def get_financial_metrics(data_dict):
                 "InterestExpense": interest_expense,
                 "BookEquity": book_equity,
                 "MinorityInterest": minority_interest,
-                "Momentum": momentum
+                "Momentum": momentum,
+                "POC": poc,
+                "VAH": vah,
+                "VAL": val,
+                "Zone_Prix": zone_prix,
+                "Dist_POC": dist_poc
             })
         except Exception as e:
             print(f"Error processing {ticker}: {e}")
