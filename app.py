@@ -175,15 +175,15 @@ def create_layout():
                                     'backgroundColor': '#dc3545', 'color': 'white'
                                 },
                                 {
-                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} eq "Prix de Gros"'},
+                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} contains "Prix de Gros"'},
                                     'color': '#28a745', 'fontWeight': 'bold'
                                 },
                                 {
-                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} eq "Prix de Détail"'},
+                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} contains "Prix de Détail"'},
                                     'color': '#fd7e14', 'fontWeight': 'bold'
                                 },
                                 {
-                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} eq "Extension Haute"'},
+                                    'if': {'column_id': 'Zone_Prix', 'filter_query': '{Zone_Prix} contains "Attendre Repli"'},
                                     'color': '#dc3545', 'fontWeight': 'bold'
                                 }
                             ]
@@ -199,22 +199,22 @@ def create_layout():
                     dbc.CardHeader(html.H4("Analyse Détaillée", className="mb-0")),
                     dbc.CardBody(id='detail-section')
                 ], className="shadow-sm mb-4")
-            ], width=12)
+            ], md=8),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Répartition Sectorielle", className="mb-0")),
+                    dbc.CardBody(dcc.Graph(id='sector-chart'), style={'height': '400px'})
+                ], className="shadow-sm mb-4")
+            ], md=4)
         ]),
 
         dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader(html.H4("Répartition Sectorielle", className="mb-0")),
-                    dbc.CardBody(dcc.Graph(id='sector-chart'))
-                ], className="shadow-sm")
-            ], md=6),
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(html.H4("Performance Relative", className="mb-0")),
+                    dbc.CardHeader(html.H4("Performance Relative Portfolio (VIP vs Momentum)", className="mb-0")),
                     dbc.CardBody(dcc.Graph(id='performance-chart'))
                 ], className="shadow-sm")
-            ], md=6)
+            ], md=12)
         ], className="mb-5"),
 
         dcc.Store(id='full-data-store')
@@ -267,7 +267,14 @@ def update_ui(data, buy_th, exit_th, selected_ranks):
 
     display_cols = base_cols + selected_ranks + end_cols
 
-    cols = [{"name": i, "id": i} for i in display_cols]
+    col_names = {
+        'Zone_Prix': 'Timing',
+        'Dist_POC': 'Dist. POC (%)',
+        'Global_Rel': 'Fiabilité',
+        'VIP_Rank': 'Rang VIP'
+    }
+
+    cols = [{"name": col_names.get(i, i), "id": i} for i in display_cols]
     
     buys = df_signals[df_signals['Signal'] == 'Buy']
     fig_sector = px.pie(buys, names='Sector', title='Répartition sectorielle du portefeuille') if not buys.empty else {}
@@ -369,7 +376,14 @@ def display_details(rows, selected_rows, buy_th, exit_th):
                 html.P(f"Equity : {fmt(row.get('BookEquity'))}"),
             ], md=4),
             dbc.Col([
-                html.H6("Timing (Volume Profile)", className="text-primary border-bottom pb-1"),
+                html.H6([
+                    "Timing (Volume Profile) ",
+                    html.Span("(i)", id="timing-info-icon", style={"cursor": "pointer", "fontSize": "0.8rem", "color": "#17a2b8"}),
+                    dbc.Tooltip(
+                        "Le prix de gros (POC) est le niveau où les volumes institutionnels sont les plus denses sur 6 mois.",
+                        target="timing-info-icon",
+                    ),
+                ], className="text-primary border-bottom pb-1"),
                 html.P(f"POC : {fmt(row.get('POC'))}"),
                 html.P(f"VAH : {fmt(row.get('VAH'))}"),
                 html.P(f"VAL : {fmt(row.get('VAL'))}"),

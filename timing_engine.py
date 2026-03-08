@@ -3,12 +3,12 @@ import numpy as np
 
 def calculate_volume_profile(history_df: pd.DataFrame, bins: int = 100):
     """
-    Calculates POC, VAH, and VAL from the last 252 days of history.
+    Calculates POC, VAH, and VAL from the last 126 days of history (approx 6 months).
     """
     if history_df is None or len(history_df) < 20:
         return None, None, None
 
-    df = history_df.tail(252).copy()
+    df = history_df.tail(126).copy()
 
     # Use the average of High and Low as the representative price for the day
     df['avg_price'] = (df['High'] + df['Low']) / 2
@@ -68,10 +68,10 @@ def get_timing_status(price, poc, vah, val):
     dist_poc = (price - poc) / poc * 100
 
     if price < poc:
-        zone = "Prix de Gros"
+        zone = "ZONE D'ACHAT (Prix de Gros) 🟢"
     elif poc <= price <= vah:
-        zone = "Prix de Détail"
+        zone = "ZONE NEUTRE (Prix de Détail) 🟡"
     else:
-        zone = "Extension Haute"
+        zone = "SUR-EXTENSION (Attendre Repli) 🔴"
 
     return zone, round(dist_poc, 1)
