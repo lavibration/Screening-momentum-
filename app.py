@@ -143,6 +143,10 @@ def create_layout():
                         dbc.Button("Rafraîchir les données", id='refresh-btn', color="primary", className="mt-3 w-100 shadow-sm"),
                         dcc.Loading(id="loading-1", type="circle", children=html.Div(id="loading-output", className="text-muted small mt-2")),
                     ])
+                ], className="shadow-sm mb-4"),
+                dbc.Card([
+                    dbc.CardHeader(html.H4("Répartition Sectorielle", className="mb-0")),
+                    dbc.CardBody(dcc.Graph(id='sector-chart'), style={'height': '350px'})
                 ], className="shadow-sm mb-4")
             ], md=3),
 
@@ -194,27 +198,23 @@ def create_layout():
         ]),
 
         dbc.Row([
+            dbc.Col([], md=3),
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader(html.H4("Analyse Détaillée", className="mb-0")),
                     dbc.CardBody(id='detail-section')
                 ], className="shadow-sm mb-4")
-            ], md=8),
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(html.H4("Répartition Sectorielle", className="mb-0")),
-                    dbc.CardBody(dcc.Graph(id='sector-chart'), style={'height': '400px'})
-                ], className="shadow-sm mb-4")
-            ], md=4)
+            ], md=9)
         ]),
 
         dbc.Row([
+            dbc.Col([], md=3),
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader(html.H4("Performance Relative Portfolio (VIP vs Momentum)", className="mb-0")),
                     dbc.CardBody(dcc.Graph(id='performance-chart'))
                 ], className="shadow-sm")
-            ], md=12)
+            ], md=9)
         ], className="mb-5"),
 
         dcc.Store(id='full-data-store')
@@ -275,9 +275,9 @@ def update_ui(data, buy_th, exit_th, selected_ranks):
     }
 
     cols = [{"name": col_names.get(i, i), "id": i} for i in display_cols]
-    
-    buys = df_signals[df_signals['Signal'] == 'Buy']
-    fig_sector = px.pie(buys, names='Sector', title='Répartition sectorielle du portefeuille') if not buys.empty else {}
+
+    buys = df_signals[df_signals['Signal'].str.contains('Buy', na=False)]
+    fig_sector = px.pie(buys, names='Sector', title='Portefeuille "Buy"') if not buys.empty else {}
 
     fig_perf = px.scatter(df_signals, x='Momentum_Rank', y='VIP_Rank', color='Signal', 
                          hover_name='Ticker', title='Momentum vs VIP Rank')
