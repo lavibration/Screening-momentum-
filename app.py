@@ -7,95 +7,6 @@ from data_provider import get_cac40_tickers, get_cac_mid_tickers, get_cac_small_
 from scoring_engine import calculate_scores
 from strategy import generate_signals
 
-def create_layout():
-    return dbc.Container([
-        dbc.Row([
-            dbc.Col(html.H1("Multivariate Factor Scoring Portfolio", className="text-center my-4"), width=12)
-        ]),
-        
-        dbc.Row([
-            dbc.Col([
-                html.H4("Configurations"),
-                html.Label("Sélection de l'indice"),
-                dbc.RadioItems(
-                    id="index-selector",
-                    options=[
-                        {"label": "CAC 40", "value": "cac40"},
-                        {"label": "CAC Mid 60", "value": "cacmid"},
-                        {"label": "CAC Small", "value": "cacsmall"},
-                    ],
-                    value="cac40",
-                    className="mb-3"
-                ),
-
-                html.Label("Seuil d'achat VIP (Top X%)"),
-                dcc.Slider(id='buy-threshold', min=50, max=100, step=5, value=80, marks={i: str(i) for i in range(50, 101, 10)}),
-                
-                html.Label("Seuil de sortie VIP"),
-                dcc.Slider(id='exit-threshold', min=0, max=80, step=5, value=50, marks={i: str(i) for i in range(0, 81, 10)}),
-
-                html.Label("Colonnes de Score à afficher", className="mt-3"),
-                dcc.Checklist(
-                    id='column-selector',
-                    options=[
-                        {'label': ' Value Rank', 'value': 'Value_Rank'},
-                        {'label': ' Investment Rank', 'value': 'Inv_Rank'},
-                        {'label': ' Profitability Rank', 'value': 'Prof_Rank'},
-                        {'label': ' Momentum Rank', 'value': 'Momentum_Rank'},
-                    ],
-                    value=['Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Momentum_Rank'],
-                    labelStyle={'display': 'block'}
-                ),
-                
-                dbc.Button("Rafraîchir les données", id='refresh-btn', color="primary", className="mt-3 w-100"),
-                dcc.Loading(id="loading-1", type="default", children=html.Div(id="loading-output")),
-            ], md=3),
-            
-            dbc.Col([
-                html.H4("Signaux et Classement VIP"),
-                dash_table.DataTable(
-                    id='signals-table',
-                    columns=[],
-                    data=[],
-                    sort_action="native",
-                    filter_action="native",
-                    page_size=10,
-                    row_selectable='single',
-                    style_table={'overflowX': 'auto'},
-                    style_cell={'textAlign': 'left'},
-                    style_data_conditional=[
-                        {
-                            'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Buy"'},
-                            'backgroundColor': '#d4edda', 'color': '#155724'
-                        },
-                        {
-                            'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Sell"'},
-                            'backgroundColor': '#f8d7da', 'color': '#721c24'
-                        },
-                        {
-                            'if': {'column_id': 'Signal', 'filter_query': '{Signal} eq "Données Insuffisantes"'},
-                            'backgroundColor': '#f8d7da', 'color': '#721c24'
-                        }
-                    ]
-                ),
-                html.Div(id='detail-section', className="mt-4")
-            ], md=9)
-        ]),
-        
-        dbc.Row([
-            dbc.Col([
-                html.H4("Répartition Sectorielle", className="mt-4"),
-                dcc.Graph(id='sector-chart')
-            ], md=6),
-            dbc.Col([
-                html.H4("Performance Relative", className="mt-4"),
-                dcc.Graph(id='performance-chart')
-            ], md=6)
-        ]),
-        
-        dcc.Store(id='full-data-store')
-    ], fluid=True)
-
 app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 
 def create_layout():
@@ -143,11 +54,11 @@ def create_layout():
                         dbc.Button("Rafraîchir les données", id='refresh-btn', color="primary", className="mt-3 w-100 shadow-sm"),
                         dcc.Loading(id="loading-1", type="circle", children=html.Div(id="loading-output", className="text-muted small mt-2")),
                     ])
-                ], className="shadow-sm mb-4"),
+                ], className="shadow-sm mb-3"),
                 dbc.Card([
                     dbc.CardHeader(html.H4("Répartition Sectorielle", className="mb-0")),
                     dbc.CardBody(dcc.Graph(id='sector-chart'), style={'height': '350px'})
-                ], className="shadow-sm mb-4")
+                ], className="shadow-sm mb-3")
             ], md=3),
 
             dbc.Col([
@@ -193,29 +104,17 @@ def create_layout():
                             ]
                         ),
                     ])
-                ], className="shadow-sm mb-4")
-            ], md=9)
-        ]),
-
-        dbc.Row([
-            dbc.Col([], md=3),
-            dbc.Col([
+                ], className="shadow-sm mb-3"),
                 dbc.Card([
                     dbc.CardHeader(html.H4("Analyse Détaillée", className="mb-0")),
                     dbc.CardBody(id='detail-section')
-                ], className="shadow-sm mb-4")
-            ], md=9)
-        ]),
-
-        dbc.Row([
-            dbc.Col([], md=3),
-            dbc.Col([
+                ], className="shadow-sm mb-3"),
                 dbc.Card([
                     dbc.CardHeader(html.H4("Performance Relative Portfolio (VIP vs Momentum)", className="mb-0")),
                     dbc.CardBody(dcc.Graph(id='performance-chart'))
-                ], className="shadow-sm")
+                ], className="shadow-sm mb-3")
             ], md=9)
-        ], className="mb-5"),
+        ]),
 
         dcc.Store(id='full-data-store')
     ], fluid=True)
@@ -262,12 +161,15 @@ def update_ui(data, buy_th, exit_th, selected_ranks):
     df = pd.DataFrame(data)
     df_signals = generate_signals(df, buy_vip_threshold=buy_th, exit_vip_threshold=exit_th)
 
-    base_cols = ['Ticker', 'Name', 'Signal', 'Zone_Prix', 'Dist_POC', 'Global_Rel', 'VIP_Rank', 'Weighting_Type']
+    base_cols = ['Ticker', 'Name', 'Signal', 'Value_Rank', 'Inv_Rank', 'Prof_Rank', 'Zone_Prix', 'Dist_POC', 'Global_Rel', 'VIP_Rank', 'Weighting_Type']
     end_cols = ['Price']
 
     display_cols = base_cols + selected_ranks + end_cols
 
     col_names = {
+        'Value_Rank': 'V',
+        'Inv_Rank': 'I',
+        'Prof_Rank': 'P',
         'Zone_Prix': 'Timing',
         'Dist_POC': 'Dist. POC (%)',
         'Global_Rel': 'Fiabilité',
@@ -334,10 +236,27 @@ def display_details(rows, selected_rows, buy_th, exit_th):
         ], className="small")
     ], className="p-3 border rounded bg-light h-100")
 
+    # Pillar breakdown Bar Chart
+    pillar_data = pd.DataFrame({
+        'Pillar': ['Value', 'Investment', 'Profitability'],
+        'Score': [row['Value_Rank'], row['Inv_Rank'], row['Prof_Rank']]
+    })
+    fig_pillars = px.bar(
+        pillar_data, x='Score', y='Pillar', orientation='h',
+        title="Détail des Scores (V, I, P)",
+        range_x=[0, 100],
+        color='Score',
+        color_continuous_scale='RdYlGn'
+    )
+    fig_pillars.update_layout(height=250, margin=dict(l=30, r=30, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', coloraxis_showscale=False)
+
     # Tab 1: Visual Analysis
-    tab1_content = dbc.Row([
-        dbc.Col(reliability_content, md=4),
-        dbc.Col(dcc.Graph(figure=fig), md=8)
+    tab1_content = html.Div([
+        dbc.Row([
+            dbc.Col(reliability_content, md=4),
+            dbc.Col(dcc.Graph(figure=fig), md=4),
+            dbc.Col(dcc.Graph(figure=fig_pillars), md=4)
+        ]),
     ], className="mt-3")
 
     # Tab 2: Fundamental Details
